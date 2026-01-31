@@ -1,7 +1,7 @@
 import random
 from abc import ABC
 from time import sleep
-from typing import Any, Callable, Literal, NotRequired, TypedDict, Unpack
+from typing import Any, Literal, NotRequired, TypedDict, Unpack
 from urllib.parse import quote
 
 import requests
@@ -14,7 +14,6 @@ type Method = Literal['GET', 'PUT', 'POST', 'PATCH', 'DELETE']
 type Headers = dict
 type APIVersion = Literal['v1']
 type OAuthVersion = Literal['v2']
-type AccessToken = str | Callable[[], str]
 
 BASE_URL = 'https://api.uber.com/{version}/customers/{customer_id}'
 OAUTH_URL = 'https://auth.uber.com/oauth'
@@ -39,10 +38,9 @@ class OptionalArguments(TypedDict):
 class Base(ABC):
     def __init__(
         self,
-        customer_id: str,
-        access_token: AccessToken,
-        /,
         *,
+        customer_id: str,
+        access_token: str,
         version: APIVersion,
         timeout: float | None = None,
         session: requests.Session | None = None,
@@ -187,11 +185,7 @@ class Base(ABC):
         # copy headers to avoid mutating caller dict
         headers = {**(headers or {})}
 
-        access_token = self._access_token
-        if callable(access_token):
-            access_token = access_token()
-
-        headers['Authorization'] = f'Bearer {access_token}'
+        headers['Authorization'] = f'Bearer {self._access_token}'
         headers.setdefault('Accept', 'application/json')
 
         # safe URL join without double slashes and with path segment quoting

@@ -17,6 +17,9 @@ type OAuthVersion = Literal['v2']
 # a callable is called on every request, so a rotated token is picked up
 # without building a new client
 type AccessToken = str | Callable[[], str]
+# called on a 401 to get a token that skips any cache, for when the token was
+# rotated or revoked since it was read
+type RefreshAccessToken = Callable[[], str]
 
 BASE_URL = 'https://api.uber.com/{version}/customers/{customer_id}'
 OAUTH_URL = 'https://auth.uber.com/oauth'
@@ -50,6 +53,7 @@ class Base(ABC):
         jitter_max: float | None = None,
         max_retries: int | None = None,
         retriable_http_codes: set[int] | None = None,
+        refresh_access_token: RefreshAccessToken | None = None,
     ) -> None:
         self._session = session or requests.Session()
         self._timeout = DEFAULT_TIMEOUT if timeout is None else timeout
@@ -58,6 +62,7 @@ class Base(ABC):
         self._max_retries = DEFAULT_MAX_RETRIES if max_retries is None else max_retries
         self._customer_id = customer_id
         self._access_token = access_token
+        self._refresh_access_token = refresh_access_token
         self._retriable_http_codes = (
             DEFAULT_RETRIABLE_HTTP_CODES
             if retriable_http_codes is None
@@ -142,6 +147,7 @@ class Base(ABC):
     ) -> Any:
         retries = 0
         exception: Exception | None = None
+        access_token: str | None = None
         while retries <= self._max_retries:
             try:
                 return self._request(
@@ -150,9 +156,21 @@ class Base(ABC):
                     params=params,
                     method=method,
                     headers=headers,
+                    access_token=access_token,
                 )
             except requests.HTTPError as e:
                 exception = e
+                # retry right away with a refreshed token, once per call
+                if (
+                    e.response.status_code == 401
+                    and self._refresh_access_token
+                    and access_token is None
+                ):
+                    access_token = self._refresh_access_token()
+                    # a callable reads the refreshed token itself next time
+                    if not callable(self._access_token):
+                        self._access_token = access_token
+                    continue
                 if e.response.status_code in self._retriable_http_codes:
                     backoff = min(2**retries, 20) + random.uniform(0, self._jitter_max)
                     # honor Retry-After if present (seconds), else exponential backoff with jitter
@@ -184,13 +202,17 @@ class Base(ABC):
         params: Params | None = None,
         method: Method,
         headers: Headers | None = None,
+        access_token: str | None = None,
     ) -> Any:
         # copy headers to avoid mutating caller dict
         headers = {**(headers or {})}
 
-        access_token = self._access_token
-        if callable(access_token):
-            access_token = access_token()
+        if access_token is None:
+            access_token = (
+                self._access_token()
+                if callable(self._access_token)
+                else self._access_token
+            )
 
         headers['Authorization'] = f'Bearer {access_token}'
         headers.setdefault('Accept', 'application/json')

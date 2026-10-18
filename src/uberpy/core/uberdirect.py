@@ -1,6 +1,6 @@
 import requests
 
-from uberpy.core.base import AccessToken, APIVersion, Base
+from uberpy.core.base import AccessToken, APIVersion, Base, RefreshAccessToken
 from uberpy.core.deliveries import Deliveries
 from uberpy.core.quotes import Quotes
 
@@ -17,6 +17,7 @@ class UberDirect(Base):
         jitter_max: float | None = None,
         max_retries: int | None = None,
         retriable_http_codes: set[int] | None = None,
+        refresh_access_token: RefreshAccessToken | None = None,
     ) -> None:
         session = session or requests.Session()
         super().__init__(
@@ -28,6 +29,7 @@ class UberDirect(Base):
             jitter_max=jitter_max,
             max_retries=max_retries,
             retriable_http_codes=retriable_http_codes,
+            refresh_access_token=refresh_access_token,
         )
         self.quotes = Quotes(
             customer_id=customer_id,
@@ -38,6 +40,7 @@ class UberDirect(Base):
             jitter_max=jitter_max,
             max_retries=max_retries,
             retriable_http_codes=retriable_http_codes,
+            refresh_access_token=refresh_access_token,
         )
         self.deliveries = Deliveries(
             customer_id=customer_id,
@@ -48,4 +51,5 @@ class UberDirect(Base):
             jitter_max=jitter_max,
             max_retries=max_retries,
             retriable_http_codes=retriable_http_codes,
+            refresh_access_token=refresh_access_token,
         )

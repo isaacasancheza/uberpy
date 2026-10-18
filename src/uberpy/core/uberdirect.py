@@ -1,6 +1,6 @@
 import requests
 
-from uberpy.core.base import APIVersion, Base
+from uberpy.core.base import AccessToken, APIVersion, Base
 from uberpy.core.deliveries import Deliveries
 from uberpy.core.quotes import Quotes
 
@@ -10,7 +10,7 @@ class UberDirect(Base):
         self,
         *,
         customer_id: str,
-        access_token: str,
+        access_token: AccessToken,
         version: APIVersion,
         timeout: float | None = None,
         session: requests.Session | None = None,
